@@ -1,0 +1,182 @@
+/* list of things that needs to be done for data cleaning process to take place */
+SELECT 
+SaleDate,
+CONVERT(date,SaleDate)
+FROM 
+[DataCleaning ].dbo.Nash
+--Standardize the date format 
+--checking what the saledate format was used 
+SELECT 
+SaleDate,
+CONVERT(date,SaleDate)
+FROM 
+[DataCleaning ].dbo.Nash
+-- changing the datatye of saledate from datetime to Date 
+ALTER TABLE [DataCleaning ].dbo.Nash
+ALTER COLUMN SaleDate date;
+-- adding new column to the table 
+-- comfiming that the salesdate colum as been updated 
+
+SELECT *
+FROM [DataCleaning ].dbo.Nash 
+-- DONE 
+-- populating the property address 
+-- this is used to check which of the propertyAddress is null and find a way to populate it 
+SELECT 
+*
+FROM 
+[DataCleaning ].dbo.Nash
+WHERE PropertyAddress IS NULL
+-- its important to note that the PercelID corespond with where the property Address is located 
+SELECT 
+a.PropertyAddress, 
+b.PropertyAddress,
+a.UniqueID,
+b.UniqueID,
+a.ParcelID,
+b.ParcelID,
+ISNULL(a.PropertyAddress, b.PropertyAddress) as PropertyAddress
+FROM 
+[DataCleaning ].dbo.Nash as a 
+join [DataCleaning ].dbo.Nash as b 
+on a.ParcelID = b.ParcelID AND 
+a.UniqueID <> b.UniqueID
+ WHERE 
+ a.PropertyAddress is null
+ -- upadating the table 
+ UPDATE a
+ SET 
+ a.PropertyAddress = ISNULL(a.PropertyAddress, b.PropertyAddress)
+ FROM 
+[DataCleaning ].dbo.Nash as a 
+join [DataCleaning ].dbo.Nash as b 
+on a.ParcelID = b.ParcelID AND 
+a.UniqueID <> b.UniqueID
+ WHERE 
+ a.PropertyAddress is null
+
+ -----sperating the address ffrom the city, real home address 
+
+ SELECT
+ PropertyAddress
+ FROM 
+ [DataCleaning ].dbo.Nash
+
+ -----
+SELECT 
+SUBSTRING(PropertyAddress, 1 ,CHARINDEX(',', PropertyAddress) -1) as PropertyAddress,
+SUBSTRING(PropertyAddress ,CHARINDEX(',', PropertyAddress) +1, LEN(PropertyAddress)) as PropertyCity
+FROM 
+[DataCleaning ].dbo.Nash
+
+--- adding of the two new column into database 
+ALTER TABLE [DataCleaning ].dbo.Nash 
+ADD propertysplitaddresss VARCHAR(50);
+
+-- update for propertyaddress 
+UPDATE [DataCleaning ].dbo.Nash 
+set 
+propertysplitaddresss = SUBSTRING(PropertyAddress, 1 ,CHARINDEX(',', PropertyAddress) -1)
+--add a new column to the table 
+ALTER TABLE [DataCleaning ].dbo.Nash 
+ADD propertsliptcity VARCHAR(50);
+
+	UPDATE [DataCleaning ].dbo.Nash 
+SET 
+propertsliptcity = SUBSTRING(PropertyAddress ,CHARINDEX(',', PropertyAddress) +1, LEN(PropertyAddress))
+
+-- view the newly updated table 
+	SELECT *
+	FROM [DataCleaning ].dbo.Nash 
+
+ --editing the owner address 
+	--SELECT OwnerAddress, ParcelID,
+	--UniqueID
+	--FROM [DataCleaning ].dbo.Nash 
+	--WHERE OwnerAddress is NULL 
+	-- splitting the owner address making use of textindex
+	SELECT OwnerAddress,
+	PARSENAME(REPLACE(OwnerAddress,',','.'),3),
+		PARSENAME(REPLACE(OwnerAddress,',','.'),2),
+	PARSENAME(REPLACE(OwnerAddress,',','.'),1)
+	FROM [DataCleaning ].dbo.Nash 
+
+
+
+
+	--updating table 
+	ALTER TABLE [DataCleaning ].dbo.Nash
+	ADD OwnerSpiltAddress VARCHAR(50);
+
+	UPDATE [DataCleaning ].dbo.Nash
+	SET 
+	OwnerSpiltAddress = PARSENAME(REPLACE(OwnerAddress,',','.'),3)
+
+	-- Create and updating Ownersplitcity 
+	ALTER TABLE [DataCleaning ].dbo.Nash 
+	ADD OwnerSplitCity VARCHAR(50);
+
+	UPDATE [DataCleaning ].dbo.Nash 
+	SET 
+	OwnerSplitcity = PARSENAME(REPLACE(OwnerAddress, ',','.'),2)
+-- create and updating OwnerSplitState 
+ALTER TABLE [DataCleaning ].dbo.Nash
+ADD OwnerSplitState VARCHAR(50);
+
+UPDATE [DataCleaning ].dbo.Nash
+SET 
+OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.'),1)
+
+-- changing the Y and N in sold vacant to YES and NO 
+SELECT 
+DISTINCT (SoldasVacant), COUNT(SoldasVacant) 
+FROM [DataCleaning ].dbo.Nash
+GROUP BY 
+SoldasVacant
+ORDER BY 
+2
+-- in other change the Y to yes make use of the replace work 
+SELECT SoldasVacant,
+CASE WHEN soldasVacant = 'Y' THEN 'Yes' 
+     WHEN SoldasVacant = 'N' THEN 'No'
+		ELSE SoldasVacant 
+		END
+FROM [DataCleaning ].dbo.Nash
+-- UPDATING THE QUERY INTO THE DATABASE 
+UPDATE [DataCleaning ].dbo.Nash
+SET 
+SoldasVacant = CASE WHEN soldasVacant = 'Y' THEN 'Yes' 
+     WHEN SoldasVacant = 'N' THEN 'No'
+		ELSE SoldasVacant 
+		END
+--CHECKING FRO AND REMOVING DUPLICATE FROM THE TABLE 
+SELECT * 
+FROM [DataCleaning ].dbo.Nash
+-- trying to detect the rows with duplicates 
+SELECT *,
+ROW_NUMBER() OVER (PARTITION BY ParcelID,
+                              PropertyAddress,
+							  SaleDate,
+							  SalePrice,
+							  LegalReference 
+							  ORDER BY UniqueID )
+FROM [DataCleaning ].dbo.Nash
+-- making a CTE for duplicate detection 
+WITH Dup_rowNum as ( SELECT *,
+ROW_NUMBER() OVER (PARTITION BY ParcelID,
+                              PropertyAddress,
+							  SaleDate,
+							  SalePrice,
+							  LegalReference 
+							  ORDER BY UniqueID ) as RowNum
+FROM [DataCleaning ].dbo.Nash
+)
+-- creating a table for the total duplicate 
+SELECT * 
+FROM Dup_rowNum
+WHERE RowNum > 1
+ --deleting the duplicate data 
+--DELETE 
+--FROM Dup_rowNum
+--WHERE RowNum > 1
+
